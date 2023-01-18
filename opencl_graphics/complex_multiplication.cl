@@ -41,4 +41,6 @@ kernel void power_complex(__global float* real_in, __global float* img_in, __glo
 	}
 	*real_out = result[0];
 	*img_out = result[1];
+	*real_out = 1111;
+	*img_out = 2222;
 }

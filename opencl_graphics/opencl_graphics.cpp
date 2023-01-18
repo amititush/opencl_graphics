@@ -10,6 +10,11 @@
 
 #define COMPLEX_MULTIPLICATION "complex_multiplication.cl"
 
+void CL_CALLBACK kernel_complete(cl_event e, cl_int status, void* data)
+{
+    std::cout << (char*)data << std::endl;
+}
+
 int main()
 {
     cl_platform_id* platforms;
@@ -196,6 +201,7 @@ int main()
     cl_kernel* kernels = (cl_kernel*)malloc(num_kernels * sizeof(cl_kernel));
     clCreateKernelsInProgram(program, num_kernels, kernels, NULL);
 
+    cl_queue_properties queue_properties[] = { CL_QUEUE_PROPERTIES | CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE };
     cl_command_queue command_queue = clCreateCommandQueueWithProperties(context, device, NULL, &err);
 
     if (err != CL_SUCCESS)
@@ -266,22 +272,31 @@ int main()
 
     real_in_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(freal_in), &freal_in, &err);
     img_in_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(fimg_in), &fimg_in, &err);
-    img_in_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(exponent_buff), &exponent_buff, &err);
-    real_out_buff = clCreateBuffer(context, CL_MEM_WRITE_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(freal_out_p), &freal_out_p, &err);
-    img_out_buff = clCreateBuffer(context, CL_MEM_WRITE_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(fimg_out_p), &fimg_out_p, &err);
+    exponent_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(exponent), &exponent, &err);
+    real_out_p_buff = clCreateBuffer(context, CL_MEM_WRITE_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(freal_out_p), &freal_out_p, &err);
+    img_out_p_buff = clCreateBuffer(context, CL_MEM_WRITE_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(fimg_out_p), &fimg_out_p, &err);
+
+    err = clSetKernelArg(kernels[1], 0, sizeof(real_in_buff), &real_in_buff);
+    err = clSetKernelArg(kernels[1], 1, sizeof(img_in_buff), &img_in_buff);
+    err = clSetKernelArg(kernels[1], 2, sizeof(exponent_buff), &exponent_buff);
+    err = clSetKernelArg(kernels[1], 3, sizeof(real_out_p_buff), &real_out_p_buff);
+    err = clSetKernelArg(kernels[1], 4, sizeof(img_out_p_buff), &img_out_p_buff);
 
     size_t global_work_size[] = { 1 };
     size_t local_work_size[] = { 1 };
-    err = clEnqueueNDRangeKernel(command_queue, kernels[0], 1, NULL, global_work_size, local_work_size, 0, NULL, NULL);
-    err = clEnqueueNDRangeKernel(command_queue, kernels[1], 1, NULL, global_work_size, local_work_size, 0, NULL, NULL);
+    cl_event kernel_execution;
+    //err = clEnqueueNDRangeKernel(command_queue, kernels[0], 1, NULL, global_work_size, local_work_size, 0, NULL, NULL);
+    err = clEnqueueNDRangeKernel(command_queue, kernels[1], 1, NULL, global_work_size, local_work_size, 0, NULL, &kernel_execution);
 
+    char kernel_message[] = "Kernel finished\n";
+    err = clSetEventCallback(kernel_execution, CL_COMPLETE, &kernel_complete, kernel_message);
     if (err != CL_SUCCESS)
     {
         std::cout << "Failed to enqueue task" << std::endl;
         return -1;
     }
     std::cout << "Computing: " << real1_in << "+" << img1_in << "i * " << real2_in << "+" << img2_in << "i" << std::endl;
-
+    /*
     if (use_fp64)
     {
         err = clEnqueueReadBuffer(command_queue, real_out_buff, CL_TRUE, 0, sizeof(real_out), &real_out, 0, NULL, NULL);
@@ -292,12 +307,12 @@ int main()
     {
         err = clEnqueueReadBuffer(command_queue, real_out_buff, CL_TRUE, 0, sizeof(freal_out), &freal_out, 0, NULL, NULL);
         err = clEnqueueReadBuffer(command_queue, img_out_buff, CL_TRUE, 0, sizeof(fimg_out), &fimg_out, 0, NULL, NULL);
-        std::cout << "Result: " << freal_out << "+" << fimg_out << "i" << std::endl;
-    }
+        std::cout << "Multiplication result: " << freal_out << "+" << fimg_out << "i" << std::endl;
+    }*/
 
-    err = clEnqueueReadBuffer(command_queue, real_out_buff, CL_TRUE, 0, sizeof(freal_out_p), &freal_out_p, 0, NULL, NULL);
-    err = clEnqueueReadBuffer(command_queue, img_out_buff, CL_TRUE, 0, sizeof(fimg_out_p), &fimg_out_p, 0, NULL, NULL);
-    std::cout << "Result: " << freal_out << "+" << fimg_out << "i" << std::endl;
+    err = clEnqueueReadBuffer(command_queue, real_out_p_buff, CL_TRUE, 0, sizeof(freal_out_p), &freal_out_p, 0, NULL, NULL);
+    err = clEnqueueReadBuffer(command_queue, img_out_p_buff, CL_TRUE, 0, sizeof(fimg_out_p), &fimg_out_p, 0, NULL, NULL);
+    std::cout << "Power result: " << freal_out_p << "+" << fimg_out_p << "i" << std::endl;
 
     if (use_fp64)
     {
@@ -307,8 +322,19 @@ int main()
     else
     {
         std::complex<float> expected_result = std::complex<float>((float)real1_in, (float)img1_in) * std::complex<float>((float)real2_in, (float)img2_in);
-        std::cout << "Expected result: " << expected_result.real() << "+" << expected_result.imag() << "i" << std::endl;
+        std::cout << "Expected multiplication result: " << expected_result.real() << "+" << expected_result.imag() << "i" << std::endl;
+
+        std::complex<double> exponent_result = pow(std::complex<double>((double)freal_in, (double)fimg_in), exponent);
+        std::cout << "Expected power result: " << exponent_result.real() << "+" << exponent_result.imag() << "i" << std::endl;
     }
+
+    clReleaseEvent(kernel_execution);
+
+    err = clReleaseMemObject(real_in_buff);
+    err = clReleaseMemObject(img_in_buff);
+    err = clReleaseMemObject(exponent_buff);
+    err = clReleaseMemObject(real_out_p_buff);
+    err = clReleaseMemObject(img_out_p_buff);
 
     err = clReleaseMemObject(real1_in_buff);
     err = clReleaseMemObject(img1_in_buff);
