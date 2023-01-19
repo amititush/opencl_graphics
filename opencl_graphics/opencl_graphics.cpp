@@ -15,6 +15,17 @@ void CL_CALLBACK kernel_complete(cl_event e, cl_int status, void* data)
     std::cout << (char*)data << std::endl;
 }
 
+std::complex<float> complex_power(std::complex<float> complex, int exponent)
+{
+    std::complex<float> result = { 0, 0 };
+    for (int i = 0; i < exponent; i++)
+    {
+        result *= std::complex<float>(complex.real() * complex.real() - complex.imag() * complex.imag(), 2 * complex.real() * complex.imag());
+    }
+
+    return result;
+}
+
 int main()
 {
     cl_platform_id* platforms;
@@ -210,92 +221,67 @@ int main()
         return -1;
     }
 
-    cl_double real1_in = (double)3 / M_PI;
-    cl_double img1_in = -(double)pow(8, M_E);
-    cl_double real2_in = -(double)M_PI / 2;
-    cl_double img2_in = 5;
-    cl_double real_out = 0;
-    cl_double img_out = 0;
-    cl_float freal_out = 0;
-    cl_float fimg_out = 0;
+    cl_double2 real1_in = { -0.8, 0.156 };
+    cl_double2 real2_in = { -(double)M_PI / 2, 5 };
+    cl_double2 real_out = { 0,0 };
+    cl_float2 freal_out = { 0,0 };
 
     cl_mem real1_in_buff;
-    cl_mem img1_in_buff;
     cl_mem real2_in_buff;
-    cl_mem img2_in_buff;
     cl_mem real_out_buff;
-    cl_mem img_out_buff;
-
+    use_fp64 = false;
     if (use_fp64)
     {
         real1_in_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(real1_in), &real1_in, &err);
-        img1_in_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(img1_in), &img1_in, &err);
         real2_in_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(real2_in), &real2_in, &err);
-        img2_in_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(img2_in), &img2_in, &err);
         real_out_buff = clCreateBuffer(context, CL_MEM_WRITE_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(real_out), &real_out, &err);
-        img_out_buff = clCreateBuffer(context, CL_MEM_WRITE_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(img_out), &img_out, &err);
     }
     else
     {
-        cl_float freal1_in = (float)real1_in;
-        cl_float fimg1_in = (float)img1_in;
-        cl_float freal2_in = (float)real2_in;
-        cl_float fimg2_in = (float)img2_in;
-        cl_float freal_out = (float)real_out;
-        cl_float fimg_out = (float)img_out;
+        cl_float2 freal1_in = {(float)real1_in.x, (float)real1_in.y};
+        cl_float2 freal2_in = { (float)real2_in.x, (float)real2_in.y };
+        cl_float2 freal_out = { (float)real_out.x, (float)real_out.y };
         real1_in_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(freal1_in), &freal1_in, &err);
-        img1_in_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(fimg1_in), &fimg1_in, &err);
         real2_in_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(freal2_in), &freal2_in, &err);
-        img2_in_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(fimg2_in), &fimg2_in, &err);
         real_out_buff = clCreateBuffer(context, CL_MEM_WRITE_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(freal_out), &freal_out, &err);
-        img_out_buff = clCreateBuffer(context, CL_MEM_WRITE_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(fimg_out), &fimg_out, &err);
     }
 
     err = clSetKernelArg(kernels[0], 0, sizeof(real1_in_buff), &real1_in_buff);
-    err = clSetKernelArg(kernels[0], 1, sizeof(img1_in_buff), &img1_in_buff);
-    err = clSetKernelArg(kernels[0], 2, sizeof(real2_in_buff), &real2_in_buff);
-    err = clSetKernelArg(kernels[0], 3, sizeof(img2_in_buff), &img2_in_buff);
-    err = clSetKernelArg(kernels[0], 4, sizeof(real_out_buff), &real_out_buff);
-    err = clSetKernelArg(kernels[0], 5, sizeof(img_out_buff), &img_out_buff);
+    err = clSetKernelArg(kernels[0], 1, sizeof(real2_in_buff), &real2_in_buff);
+    err = clSetKernelArg(kernels[0], 2, sizeof(real_out_buff), &real_out_buff);
 
-    cl_float freal_in = (float)real1_in;
-    cl_float fimg_in = (float)img1_in;
+    cl_float2 freal_in = { (float)real1_in.x, (float)real1_in.y };
     cl_int exponent = 8;
-    cl_float freal_out_p = 0;
-    cl_float fimg_out_p = 0;
+    cl_float2 freal_out_p = {0,0};
 
     cl_mem real_in_buff;
-    cl_mem img_in_buff;
     cl_mem exponent_buff;
     cl_mem real_out_p_buff;
-    cl_mem img_out_p_buff;
 
     real_in_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(freal_in), &freal_in, &err);
-    img_in_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(fimg_in), &fimg_in, &err);
     exponent_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(exponent), &exponent, &err);
     real_out_p_buff = clCreateBuffer(context, CL_MEM_WRITE_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(freal_out_p), &freal_out_p, &err);
-    img_out_p_buff = clCreateBuffer(context, CL_MEM_WRITE_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(fimg_out_p), &fimg_out_p, &err);
 
     err = clSetKernelArg(kernels[1], 0, sizeof(real_in_buff), &real_in_buff);
-    err = clSetKernelArg(kernels[1], 1, sizeof(img_in_buff), &img_in_buff);
-    err = clSetKernelArg(kernels[1], 2, sizeof(exponent_buff), &exponent_buff);
-    err = clSetKernelArg(kernels[1], 3, sizeof(real_out_p_buff), &real_out_p_buff);
-    err = clSetKernelArg(kernels[1], 4, sizeof(img_out_p_buff), &img_out_p_buff);
+    err = clSetKernelArg(kernels[1], 1, sizeof(exponent_buff), &exponent_buff);
+    err = clSetKernelArg(kernels[1], 2, sizeof(real_out_p_buff), &real_out_p_buff);
 
     size_t global_work_size[] = { 1 };
     size_t local_work_size[] = { 1 };
-    cl_event kernel_execution;
+    cl_event kernel_execution = 0;
     //err = clEnqueueNDRangeKernel(command_queue, kernels[0], 1, NULL, global_work_size, local_work_size, 0, NULL, NULL);
-    err = clEnqueueNDRangeKernel(command_queue, kernels[1], 1, NULL, global_work_size, local_work_size, 0, NULL, &kernel_execution);
+    err = clEnqueueNDRangeKernel(command_queue, kernels[1], 1, NULL, global_work_size, local_work_size, 0, NULL, NULL);
+
+    err = clEnqueueReadBuffer(command_queue, real_out_p_buff, CL_TRUE, 0, sizeof(freal_out_p), &freal_out_p, 0, NULL, NULL);
 
     char kernel_message[] = "Kernel finished\n";
-    err = clSetEventCallback(kernel_execution, CL_COMPLETE, &kernel_complete, kernel_message);
+    //err = clSetEventCallback(kernel_execution, CL_COMPLETE, &kernel_complete, kernel_message);
     if (err != CL_SUCCESS)
     {
         std::cout << "Failed to enqueue task" << std::endl;
         return -1;
     }
-    std::cout << "Computing: " << real1_in << "+" << img1_in << "i * " << real2_in << "+" << img2_in << "i" << std::endl;
+    std::cout << "Computing: (" << real1_in.x << "+" << real1_in.y << "i)^" << exponent << std::endl;
     /*
     if (use_fp64)
     {
@@ -310,38 +296,36 @@ int main()
         std::cout << "Multiplication result: " << freal_out << "+" << fimg_out << "i" << std::endl;
     }*/
 
-    err = clEnqueueReadBuffer(command_queue, real_out_p_buff, CL_TRUE, 0, sizeof(freal_out_p), &freal_out_p, 0, NULL, NULL);
-    err = clEnqueueReadBuffer(command_queue, img_out_p_buff, CL_TRUE, 0, sizeof(fimg_out_p), &fimg_out_p, 0, NULL, NULL);
-    std::cout << "Power result: " << freal_out_p << "+" << fimg_out_p << "i" << std::endl;
+    
+    std::cout << "Power result: " << freal_out_p.x << "+" << freal_out_p.y << "i" << std::endl;
 
     if (use_fp64)
     {
-        std::complex<double> expected_result = std::complex<double>(real1_in, img1_in) * std::complex<double>(real2_in, img2_in);
+        std::complex<double> expected_result = std::complex<double>(real1_in.x, real1_in.y) * std::complex<double>(real2_in.x, real2_in.y);
         std::cout << "Expected result: " << expected_result.real() << "+" << expected_result.imag() << "i" << std::endl;
+
+        std::complex<double> exponent_result = pow(std::complex<double>((double)freal_in.x, (double)freal_in.y), exponent);
+        std::cout << "Expected power result: " << exponent_result.real() << "+" << exponent_result.imag() << "i" << std::endl;
     }
     else
     {
-        std::complex<float> expected_result = std::complex<float>((float)real1_in, (float)img1_in) * std::complex<float>((float)real2_in, (float)img2_in);
-        std::cout << "Expected multiplication result: " << expected_result.real() << "+" << expected_result.imag() << "i" << std::endl;
+        std::complex<float> expected_result = std::complex<float>((float)real1_in.x, (float)real1_in.y) * std::complex<float>((float)real2_in.x, (float)real2_in.y);
+        //std::cout << "Expected multiplication result: " << expected_result.real() << "+" << expected_result.imag() << "i" << std::endl;
 
-        std::complex<double> exponent_result = pow(std::complex<double>((double)freal_in, (double)fimg_in), exponent);
+        std::complex<double> exponent_result = complex_power(std::complex<float>(freal_in.x, freal_in.y), exponent);
+        exponent_result = exponent_result = pow(std::complex<double>((double)freal_in.x, (double)freal_in.y), exponent);
         std::cout << "Expected power result: " << exponent_result.real() << "+" << exponent_result.imag() << "i" << std::endl;
     }
 
     clReleaseEvent(kernel_execution);
 
     err = clReleaseMemObject(real_in_buff);
-    err = clReleaseMemObject(img_in_buff);
     err = clReleaseMemObject(exponent_buff);
     err = clReleaseMemObject(real_out_p_buff);
-    err = clReleaseMemObject(img_out_p_buff);
 
     err = clReleaseMemObject(real1_in_buff);
-    err = clReleaseMemObject(img1_in_buff);
     err = clReleaseMemObject(real2_in_buff);
-    err = clReleaseMemObject(img2_in_buff);
     err = clReleaseMemObject(real_out_buff);
-    err = clReleaseMemObject(img_out_buff);
 
     for (unsigned int i = 0; i < num_kernels; i++)
     {
