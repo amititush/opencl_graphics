@@ -10,6 +10,9 @@
 
 #define COMPLEX_MULTIPLICATION "complex_multiplication.cl"
 
+#define WIDTH 800
+#define HEIGHT 800
+
 void CL_CALLBACK kernel_complete(cl_event e, cl_int status, void* data)
 {
     std::cout << (char*)data << std::endl;
@@ -260,11 +263,34 @@ int main()
 
     real_in_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(freal_in), &freal_in, &err);
     exponent_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(exponent), &exponent, &err);
-    real_out_p_buff = clCreateBuffer(context, CL_MEM_WRITE_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(freal_out_p), &freal_out_p, &err);
+    real_out_p_buff = clCreateBuffer(context, CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR, sizeof(freal_out_p), &freal_out_p, &err);
 
     err = clSetKernelArg(kernels[1], 0, sizeof(real_in_buff), &real_in_buff);
     err = clSetKernelArg(kernels[1], 1, sizeof(exponent_buff), &exponent_buff);
     err = clSetKernelArg(kernels[1], 2, sizeof(real_out_p_buff), &real_out_p_buff);
+
+    cl_mem image;
+    cl_image_format imageFormat = {};
+    imageFormat.image_channel_order = CL_RGBA;
+    imageFormat.image_channel_data_type = CL_UNSIGNED_INT8;
+    cl_image_desc imageDesc = {};
+    imageDesc.image_type = CL_MEM_OBJECT_IMAGE2D;
+    imageDesc.image_width = WIDTH;
+    imageDesc.image_height = HEIGHT;
+    imageDesc.image_depth = 0;
+    imageDesc.image_array_size = 0;
+    imageDesc.image_row_pitch = 0;
+    imageDesc.num_mip_levels = 0;
+    imageDesc.num_samples = 0;
+    imageDesc.buffer = 0;
+    imageDesc.mem_object = 0;
+    char* imageData;
+    imageData = (char*)malloc(WIDTH * HEIGHT * 4);
+    image = clCreateImage(context, CL_MEM_WRITE_ONLY, &imageFormat, &imageDesc, NULL, &err);
+    
+    cl_sampler sampler = clCreateSamplerWithProperties(context, NULL, &err);
+
+    err = clSetKernelArg(kernels[2], 0, sizeof(image), &image);
 
     size_t global_work_size[] = { 1 };
     size_t local_work_size[] = { 1 };
@@ -273,6 +299,10 @@ int main()
     err = clEnqueueNDRangeKernel(command_queue, kernels[1], 1, NULL, global_work_size, local_work_size, 0, NULL, NULL);
 
     err = clEnqueueReadBuffer(command_queue, real_out_p_buff, CL_TRUE, 0, sizeof(freal_out_p), &freal_out_p, 0, NULL, NULL);
+
+    err = clEnqueueNDRangeKernel(command_queue, kernels[2], 1, NULL, global_work_size, local_work_size, 0, NULL, NULL);
+    //err = clEnqueueReadBuffer(command_queue, image, CL_TRUE, 0, sizeof(freal_out_p), &freal_out_p, 0, NULL, NULL);
+    err = clEnqueueMapImage(command_queue, image, )
 
     char kernel_message[] = "Kernel finished\n";
     //err = clSetEventCallback(kernel_execution, CL_COMPLETE, &kernel_complete, kernel_message);
