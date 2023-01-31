@@ -2,13 +2,21 @@
 //
 
 #define _USE_MATH_DEFINES
+#define _CRT_SECURE_NO_WARNINGS
 
 #include <iostream>
 #include <CL/cl.h>
 #include <math.h>
 #include <complex>
+#include <string>
+using namespace std;
 
 #define COMPLEX_MULTIPLICATION "complex_multiplication.cl"
+
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image.h"
+#include "stb_image_write.h"
 
 #define WIDTH 800
 #define HEIGHT 800
@@ -300,10 +308,14 @@ int main()
 
     err = clEnqueueReadBuffer(command_queue, real_out_p_buff, CL_TRUE, 0, sizeof(freal_out_p), &freal_out_p, 0, NULL, NULL);
 
-    err = clEnqueueNDRangeKernel(command_queue, kernels[2], 1, NULL, global_work_size, local_work_size, 0, NULL, NULL);
+    size_t pixel_global_work_size[] = { WIDTH, HEIGHT };
+    err = clEnqueueNDRangeKernel(command_queue, kernels[2], 2, NULL, pixel_global_work_size, NULL, 0, NULL, NULL);
     //err = clEnqueueReadBuffer(command_queue, image, CL_TRUE, 0, sizeof(freal_out_p), &freal_out_p, 0, NULL, NULL);
-    err = clEnqueueMapImage(command_queue, image, )
-
+    size_t origin[] = { 0, 0, 0 };
+    size_t region[] = { WIDTH, HEIGHT, 1 };
+    size_t size = WIDTH * 4;
+    void* mapped_memory = clEnqueueMapImage(command_queue, image, CL_TRUE, CL_MAP_READ, origin, region, &size, 0, 0, nullptr, nullptr, &err);
+    memcpy(imageData, mapped_memory, WIDTH* HEIGHT * 4);
     char kernel_message[] = "Kernel finished\n";
     //err = clSetEventCallback(kernel_execution, CL_COMPLETE, &kernel_complete, kernel_message);
     if (err != CL_SUCCESS)
@@ -346,6 +358,12 @@ int main()
         exponent_result = exponent_result = pow(std::complex<double>((double)freal_in.x, (double)freal_in.y), exponent);
         std::cout << "Expected power result: " << exponent_result.real() << "+" << exponent_result.imag() << "i" << std::endl;
     }
+
+    string extension = ".png";
+    string fileName = "pics/image";
+    //fileName.append(std::to_string(k).c_str());
+    fileName.append(extension.c_str());
+    stbi_write_png(fileName.c_str(), WIDTH, HEIGHT, 4, imageData, WIDTH * 4);
 
     clReleaseEvent(kernel_execution);
 

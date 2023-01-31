@@ -60,8 +60,9 @@ kernel void power_complex(__global float2* real_in, __global int* exponent, __gl
 kernel void image_proc(write_only image2d_t image)
 {
 	uint2 dims = (uint2)(get_image_width(image),get_image_height(image));
-	uint2 coord = (uint2)(get_global_id(0),get_global_id(1));
-	float2 fraction = (float2)coord/dims;
-	uint4 color = (uint4)(fraction*255, fraction*255, fraction*255, 255);
+	int2 coord = (int2)(get_global_id(0),get_global_id(1));
+	float2 fraction = (float2)((float)coord[0]/dims[0], (float)coord[1]/dims[1]);
+	uint4 color = (uint4)((uint)(fraction.x*255), (uint)(fraction.x*255), (uint)(fraction.x*255), 255);
+	//color = (uint4)(30, 30, 30, 30);
 	write_imageui(image, coord, color);
 }
