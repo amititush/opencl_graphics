@@ -37,3 +37,4 @@ x64/
 stb_image*.h
 *.sln
 *.vcx*
+opencl_graphics/Debug/

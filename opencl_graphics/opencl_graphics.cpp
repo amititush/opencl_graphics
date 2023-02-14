@@ -9,6 +9,7 @@
 #include <math.h>
 #include <complex>
 #include <string>
+#include <vector>
 using namespace std;
 
 #define COMPLEX_MULTIPLICATION "complex_multiplication.cl"
@@ -18,8 +19,198 @@ using namespace std;
 #include "stb_image.h"
 #include "stb_image_write.h"
 
-#define WIDTH 800
-#define HEIGHT 800
+#define WIDTH 10000
+#define HEIGHT 10000
+
+#define COLORS 64
+
+#include <chrono>
+using namespace std::chrono;
+
+double lerp(double t, double a, double b)
+{
+    return a + t * (b - a);
+}
+
+void ColorMap(int iteration, unsigned char& r, unsigned char& g, unsigned char& b, float t)
+{
+    float fr;
+    float fg;
+    float fb;
+
+    //double t = (double)iteration / maxIterations;
+    if (t >= 0 && t < 0.16)
+    {
+        float r1 = 0;
+        float g1 = 7.0 / 255;
+        float b1 = 100.0 / 255;
+        float r2 = 32.0 / 255;
+        float g2 = 107.0 / 255;
+        float b2 = 203.0 / 255;
+
+        //t = 0.16;
+        fr = r1 + (t / 0.16) * (r2 - r1);
+        fg = g1 + (t / 0.16) * (g2 - g1);
+        fb = b1 + (t / 0.16) * (b2 - b1);
+    }
+    else if (t >= 0.16 && t < 0.42)
+    {
+        float r1 = 32.0 / 255;
+        float g1 = 107.0 / 255;
+        float b1 = 203.0 / 255;
+        float r2 = 237.0 / 255;
+        float g2 = 1;
+        float b2 = 1;
+        //t = 0.42;
+        fr = r1 + ((t - 0.16) / (0.42 - 0.16)) * (r2 - r1);
+        fg = g1 + ((t - 0.16) / (0.42 - 0.16)) * (g2 - g1);
+        fb = b1 + ((t - 0.16) / (0.42 - 0.16)) * (b2 - b1);
+    }
+    else if (t >= 0.42 && t < 0.6425)
+    {
+        float r1 = 237.0 / 255;
+        float g1 = 1;
+        float b1 = 1;
+        float r2 = 1;
+        float g2 = 170.0 / 255;
+        float b2 = 0;
+
+        //t = 0.6425;
+        fr = r1 + ((t - 0.42) / (0.6425 - 0.42)) * (r2 - r1);
+        fg = g1 + ((t - 0.42) / (0.6425 - 0.42)) * (g2 - g1);
+        fb = b1 + ((t - 0.42) / (0.6425 - 0.42)) * (b2 - b1);
+    }
+    else if (t >= 0.6425 && t < 0.8575)
+    {
+        float r1 = 1;
+        float g1 = 170.0 / 255;
+        float b1 = 0;
+        float r2 = 0;
+        float g2 = 2.0 / 255;
+        float b2 = 0;
+        // t = 0.8575;
+        fr = r1 + ((t - 0.6425) / (0.8575 - 0.6425)) * (r2 - r1);
+        fg = g1 + ((t - 0.6425) / (0.8575 - 0.6425)) * (g2 - g1);
+        fb = b1 + ((t - 0.6425) / (0.8575 - 0.6425)) * (b2 - b1);
+    }
+    else
+    {   
+        float r1 = 0;
+        float g1 = 2.0 / 255;
+        float b1 = 0;
+        float r2 = 0;
+        float g2 = 7.0 / 255;
+        float b2 = 100.0 / 255;
+        //t = 1;
+        fr = r1 + ((t - 0.8575) / (1 - 0.8575)) * (r2 - r1);
+        fg = g1 + ((t - 0.8575) / (1 - 0.8575)) * (g2 - g1);
+        fb = b1 + ((t - 0.8575) / (1 - 0.8575)) * (b2 - b1);
+    }
+
+    r = 255*fr;
+    g = 255*fg;
+    b = 255*fb;
+
+    return;
+}
+
+void ColorMapNoBlack(int iteration, unsigned char& r, unsigned char& g, unsigned char& b, float t)
+{
+    float fr;
+    float fg;
+    float fb;
+
+    //double t = (double)iteration / maxIterations;
+    if (t >= 0 && t < 0.16)
+    {
+        float r1 = 0;
+        float g1 = 7.0 / 255;
+        float b1 = 100.0 / 255;
+        float r2 = 32.0 / 255;
+        float g2 = 107.0 / 255;
+        float b2 = 203.0 / 255;
+
+        //t = 0.16;
+        fr = r1 + (t / 0.16) * (r2 - r1);
+        fg = g1 + (t / 0.16) * (g2 - g1);
+        fb = b1 + (t / 0.16) * (b2 - b1);
+    }
+    else if (t >= 0.16 && t < 0.42)
+    {
+        float r1 = 32.0 / 255;
+        float g1 = 107.0 / 255;
+        float b1 = 203.0 / 255;
+        float r2 = 237.0 / 255;
+        float g2 = 1;
+        float b2 = 1;
+        //t = 0.42;
+        fr = r1 + ((t - 0.16) / (0.42 - 0.16)) * (r2 - r1);
+        fg = g1 + ((t - 0.16) / (0.42 - 0.16)) * (g2 - g1);
+        fb = b1 + ((t - 0.16) / (0.42 - 0.16)) * (b2 - b1);
+    }
+    else if (t >= 0.42 && t < 0.6425)
+    {
+        float r1 = 237.0 / 255;
+        float g1 = 1;
+        float b1 = 1;
+        float r2 = 1;
+        float g2 = 170.0 / 255;
+        float b2 = 0;
+
+        //t = 0.6425;
+        fr = r1 + ((t - 0.42) / (0.6425 - 0.42)) * (r2 - r1);
+        fg = g1 + ((t - 0.42) / (0.6425 - 0.42)) * (g2 - g1);
+        fb = b1 + ((t - 0.42) / (0.6425 - 0.42)) * (b2 - b1);
+    }
+    else if (t >= 0.6425 && t < 0.8575)
+    {
+        float r1 = 1;
+        float g1 = 170.0 / 255;
+        float b1 = 0;
+        float r2 = 0;
+        float g2 = 2.0 / 255;
+        float b2 = 0.5;
+        // t = 0.8575;
+        fr = r1 + ((t - 0.6425) / (0.8575 - 0.6425)) * (r2 - r1);
+        fg = g1 + ((t - 0.6425) / (0.8575 - 0.6425)) * (g2 - g1);
+        fb = b1 + ((t - 0.6425) / (0.8575 - 0.6425)) * (b2 - b1);
+    }
+    else
+    {
+        float r1 = 0;
+        float g1 = 2.0 / 255;
+        float b1 = 0.5;
+        float r2 = 0;
+        float g2 = 7.0 / 255;
+        float b2 = 100.0 / 255;
+        //t = 1;
+        fr = r1 + ((t - 0.8575) / (1 - 0.8575)) * (r2 - r1);
+        fg = g1 + ((t - 0.8575) / (1 - 0.8575)) * (g2 - g1);
+        fb = b1 + ((t - 0.8575) / (1 - 0.8575)) * (b2 - b1);
+    }
+
+    r = 255* fr;
+    g = 255* fg;
+    b = 255* fb;
+
+    return;
+}
+
+void PreComputeColors(unsigned char *colors, int colorCount, bool black)
+{
+    vector<unsigned char> color = { 0, 0, 0, 255 };
+    for (int i = 0; i < colorCount; i++)
+    {
+        if (black)
+            ColorMap(i, color[0], color[1], color[2], float(i) / colorCount);
+        else
+            ColorMapNoBlack(i, color[0], color[1], color[2], float(i) / colorCount);
+        colors[i*4] = color[0];
+        colors[i * 4 + 1] = color[1];
+        colors[i * 4 + 2] = color[2];
+        colors[i * 4 + 3] = 255;
+    }
+}
 
 void CL_CALLBACK kernel_complete(cl_event e, cl_int status, void* data)
 {
@@ -39,6 +230,11 @@ std::complex<float> complex_power(std::complex<float> complex, int exponent)
 
 int main()
 {
+    // vector<vector<unsigned char>> colors;
+    unsigned char colors[COLORS*4];
+    //colors.resize(COLORS);
+    PreComputeColors(colors, COLORS, false);
+
     cl_platform_id* platforms;
     cl_uint numPlatforms = 0;
     clGetPlatformIDs(32, NULL, &numPlatforms);
@@ -139,7 +335,7 @@ int main()
     contextDeviceId = (cl_device_id*)malloc(numDevices * sizeof(cl_device_id));
     clGetContextInfo(context, CL_CONTEXT_DEVICES, numDevices * sizeof(cl_device_id), contextDeviceId, nullptr);
     char contextDeviceName[32];
-    cl_int err = CL_INVALID_DEVICE;
+    cl_int err = 0;
     if (numDevices > 0)
         err = clGetDeviceInfo(contextDeviceId[0], CL_DEVICE_NAME, 32, contextDeviceName, NULL);
     if (err != CL_SUCCESS)
@@ -292,13 +488,39 @@ int main()
     imageDesc.num_samples = 0;
     imageDesc.buffer = 0;
     imageDesc.mem_object = 0;
-    char* imageData;
-    imageData = (char*)malloc(WIDTH * HEIGHT * 4);
+    unsigned char* imageData;
+    imageData = (unsigned char*)malloc(WIDTH * HEIGHT * 4);
     image = clCreateImage(context, CL_MEM_WRITE_ONLY, &imageFormat, &imageDesc, NULL, &err);
     
-    cl_sampler sampler = clCreateSamplerWithProperties(context, NULL, &err);
+    cl_sampler_properties samplerProperties[] = { CL_SAMPLER_NORMALIZED_COORDS, CL_FALSE, CL_SAMPLER_ADDRESSING_MODE, CL_ADDRESS_CLAMP, CL_SAMPLER_FILTER_MODE, CL_FILTER_NEAREST,0 };
+    
+
+    cl_sampler sampler = clCreateSamplerWithProperties(context, samplerProperties, &err);
+
+    cl_mem paletteImage;
+    cl_image_format paletteImageFormat = {};
+    paletteImageFormat.image_channel_order = CL_RGBA;
+    paletteImageFormat.image_channel_data_type = CL_UNSIGNED_INT8;
+    cl_image_desc paletteImageDesc = {};
+    paletteImageDesc.image_type = CL_MEM_OBJECT_IMAGE1D;
+    paletteImageDesc.image_width = COLORS;
+    paletteImageDesc.image_height = 1;
+    paletteImageDesc.image_depth = 0;
+    paletteImageDesc.image_array_size = 0;
+    paletteImageDesc.image_row_pitch = 0;
+    paletteImageDesc.num_mip_levels = 0;
+    paletteImageDesc.num_samples = 0;
+    paletteImageDesc.buffer = 0;
+    paletteImageDesc.mem_object = 0;
+    unsigned char* paletteImageData;
+    paletteImageData = (unsigned char*)malloc(COLORS * 4 * sizeof(unsigned char));
+    //memcpy(paletteImageData, colors, COLORS * 4 * sizeof(unsigned char));
+    paletteImage = clCreateImage(context, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY, &paletteImageFormat, &paletteImageDesc, colors, &err);
+    cl_sampler paletteSampler = clCreateSamplerWithProperties(context, samplerProperties, &err);
 
     err = clSetKernelArg(kernels[2], 0, sizeof(image), &image);
+    err = clSetKernelArg(kernels[2], 1, sizeof(paletteImage), &paletteImage);
+    err = clSetKernelArg(kernels[2], 2, sizeof(paletteSampler), &paletteSampler);
 
     size_t global_work_size[] = { 1 };
     size_t local_work_size[] = { 1 };
@@ -308,6 +530,7 @@ int main()
 
     err = clEnqueueReadBuffer(command_queue, real_out_p_buff, CL_TRUE, 0, sizeof(freal_out_p), &freal_out_p, 0, NULL, NULL);
 
+    auto startTime = high_resolution_clock::now();
     size_t pixel_global_work_size[] = { WIDTH, HEIGHT };
     err = clEnqueueNDRangeKernel(command_queue, kernels[2], 2, NULL, pixel_global_work_size, NULL, 0, NULL, NULL);
     //err = clEnqueueReadBuffer(command_queue, image, CL_TRUE, 0, sizeof(freal_out_p), &freal_out_p, 0, NULL, NULL);
@@ -384,6 +607,11 @@ int main()
 
     clReleaseContext(context);
     //clReleaseDevice(device);
+
+    auto stop = high_resolution_clock::now();
+    auto duration = duration_cast<milliseconds>(stop - startTime);
+
+    cout << duration.count() << endl;
 
 
     return 0;
