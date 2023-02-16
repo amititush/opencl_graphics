@@ -3,21 +3,27 @@
 #endif
 
 // mandelbrot
-float X_MIN = -2.25;
-float X_MAX = 0.75;
-float Y_MIN = -1.5;
-float Y_MAX = 1.5;
+//float X_MIN = -2.25;
+//float X_MAX = 0.75;
+//float Y_MIN = -1.5;
+//float Y_MAX = 1.5;
 
 // seahorse tail zoom
-//float X_MIN = -0.7435669 - 0.0011439;
-//float X_MAX = -0.7435669 + 0.0011439;
-//float Y_MIN = -0.1314023 - 0.0011439;
-//float Y_MAX = -0.1314023 + 0.0011439;
+__constant float X_MIN = -0.7435669 - 0.0011439;
+__constant float X_MAX = -0.7435669 + 0.0011439;
+__constant float Y_MIN = -0.1314023 - 0.0011439;
+__constant float Y_MAX = -0.1314023 + 0.0011439;
 
-int MAX_ITERATIONS = 1000;
-int RADIUS = 256;
+// seahorse tail
+//float X_MIN = -0.7435669 - 0.0022878;
+//float X_MAX = -0.7435669 + 0.0022878;
+//float Y_MIN = -0.1314023 - 0.0022878;
+//float Y_MAX = -0.1314023 + 0.0022878;
 
-int COLORS = 64;
+__constant int MAX_ITERATIONS = 1000;
+__constant int RADIUS = 256;
+		   
+__constant int COLORS = 64;
 
 
 float3 HSVtoRGB(float fH, float fS, float fV) {
