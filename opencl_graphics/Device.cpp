@@ -515,6 +515,14 @@ int Device::runMandelbrot()
 
 void Device::updatePosition()
 {
+    position.x = (float)dPosition.x;
+    position.y = (float)dPosition.y;
+    position.z = (float)dPosition.z;
+    position.w = (float)dPosition.w;
+    realPosition.x = (float)dPosition.x;
+    realPosition.y = (float)dPosition.y;
+    realPosition.z = (float)dPosition.z;
+    realPosition.w = (float)dPosition.w;
     if (!use_fp64)
     {
         void* mapped_memory = clEnqueueMapBuffer(command_queue, positionBuffer, CL_TRUE, CL_MAP_WRITE, 0, sizeof(cl_float4), NULL, NULL, NULL, NULL);

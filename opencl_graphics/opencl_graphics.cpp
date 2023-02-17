@@ -174,6 +174,7 @@ int main()
                 }
                 device.runMandelbrot();
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, device.width, device.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, device.imageData);
+
                 position[0] = device.position.x;
                 position[1] = device.position.y;
                 position[2] = device.position.z;
@@ -189,6 +190,9 @@ int main()
             }
             const std::string zoomValue = "Zoom value x" + std::to_string(1/device.zoomValue);
             ImGui::Text(zoomValue.c_str());
+
+            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+
             ImGui::End();
         }
 
