@@ -249,6 +249,25 @@ int Device::initDevice()
 
     std::cout << "Chosen device: " << deviceName << ", cores: " << cores << std::endl;
 
+    size_t size_extensions = 0;
+    char* extensions;
+    clGetDeviceInfo(deviceId, CL_DEVICE_EXTENSIONS, 0, NULL, &size_extensions);
+    extensions = (char*)malloc(size_extensions * sizeof(char));
+    clGetDeviceInfo(deviceId, CL_DEVICE_EXTENSIONS, size_extensions, extensions, NULL);
+    std::cout << extensions << std::endl;
+    char desired_extension[] = "cl_khr_fp64";
+    if (strstr(extensions, desired_extension))
+    {
+        std::cout << "Found extension: " << desired_extension << std::endl;
+        use_fp64 = true;
+    }
+    else
+    {
+        std::cout << "Extension not found: " << desired_extension << std::endl;
+
+    }
+    //use_fp64 = false;
+
     cl_int err = 0;
     context = clCreateContext(NULL, 1, &deviceId, nullptr, nullptr, &err);
     if (err != CL_SUCCESS)
@@ -345,7 +364,18 @@ int Device::initDevice()
     }
     std::cout << "Created program: " << COMPLEX_MULTIPLICATION << std::endl;
 
-    built_program = clBuildProgram(program, 1, &deviceId, NULL, NULL, NULL);
+    char* options;
+    if (use_fp64)
+    {
+        char option[] = "-DFP_64";
+        options = (char*)malloc(sizeof(option));
+        memcpy(options, option, sizeof(option));
+    }
+
+    if (!use_fp64)
+        built_program = clBuildProgram(program, 1, &deviceId, NULL, NULL, NULL);
+    else
+        built_program = clBuildProgram(program, 1, &deviceId, options, NULL, NULL);
 
     if (built_program != CL_SUCCESS)
     {
@@ -413,13 +443,23 @@ int Device::initDevice()
     paletteImage = clCreateImage(context, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY, &paletteImageFormat, &paletteImageDesc, colors, &err);
     paletteSampler = clCreateSamplerWithProperties(context, samplerProperties, &err);
 
-    cl_mem positionBuffer;
-    positionBuffer = clCreateBuffer(context, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY, sizeof(cl_float4), &position, &err);
+    if (!use_fp64)
+    {
+        positionBuffer = clCreateBuffer(context, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY, sizeof(cl_float4), &position, &err);
 
-    err = clSetKernelArg(kernels[2], 0, sizeof(image), &image);
-    err = clSetKernelArg(kernels[2], 1, sizeof(paletteImage), &paletteImage);
-    err = clSetKernelArg(kernels[2], 2, sizeof(paletteSampler), &paletteSampler);
-    err = clSetKernelArg(kernels[2], 3, sizeof(positionBuffer), &positionBuffer);
+        err = clSetKernelArg(kernels[2], 0, sizeof(image), &image);
+        err = clSetKernelArg(kernels[2], 1, sizeof(paletteImage), &paletteImage);
+        err = clSetKernelArg(kernels[2], 2, sizeof(paletteSampler), &paletteSampler);
+        err = clSetKernelArg(kernels[2], 3, sizeof(positionBuffer), &positionBuffer);
+    }
+    else
+    {
+        positionBuffer = clCreateBuffer(context, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_ONLY, sizeof(cl_double4), &dPosition, &err);
+        err = clSetKernelArg(kernels[3], 0, sizeof(image), &image);
+        err = clSetKernelArg(kernels[3], 1, sizeof(paletteImage), &paletteImage);
+        err = clSetKernelArg(kernels[3], 2, sizeof(paletteSampler), &paletteSampler);
+        err = clSetKernelArg(kernels[3], 3, sizeof(positionBuffer), &positionBuffer);
+    }
 }
 
 int Device::shutdownDevice()
@@ -443,7 +483,11 @@ int Device::runMandelbrot()
 
     auto startTime = high_resolution_clock::now();
     size_t pixel_global_work_size[] = { width, height };
-    cl_int err = clEnqueueNDRangeKernel(command_queue, kernels[2], 2, NULL, pixel_global_work_size, NULL, 0, NULL, NULL);
+    cl_int err;
+    if (!use_fp64)
+        err = clEnqueueNDRangeKernel(command_queue, kernels[2], 2, NULL, pixel_global_work_size, NULL, 0, NULL, NULL);
+    else
+        err = clEnqueueNDRangeKernel(command_queue, kernels[3], 2, NULL, pixel_global_work_size, NULL, 0, NULL, NULL);
     //err = clEnqueueReadBuffer(command_queue, image, CL_TRUE, 0, sizeof(freal_out_p), &freal_out_p, 0, NULL, NULL);
     size_t origin[] = { 0, 0, 0 };
     size_t region[] = { width, height, 1 };
@@ -467,6 +511,22 @@ int Device::runMandelbrot()
     //cout << "FPS: " << 1000.0f / duration.count() << endl;
 
     return 0;
+}
+
+void Device::updatePosition()
+{
+    if (!use_fp64)
+    {
+        void* mapped_memory = clEnqueueMapBuffer(command_queue, positionBuffer, CL_TRUE, CL_MAP_WRITE, 0, sizeof(cl_float4), NULL, NULL, NULL, NULL);
+        memcpy(mapped_memory, &position, sizeof(cl_float4));
+        clEnqueueUnmapMemObject(command_queue, positionBuffer, mapped_memory, 0, NULL, NULL);
+    }
+    else
+    {
+        void* mapped_memory = clEnqueueMapBuffer(command_queue, positionBuffer, CL_TRUE, CL_MAP_WRITE, 0, sizeof(cl_double4), NULL, NULL, NULL, NULL);
+        memcpy(mapped_memory, &dPosition, sizeof(cl_double4));
+        clEnqueueUnmapMemObject(command_queue, positionBuffer, mapped_memory, 0, NULL, NULL);
+    }
 }
 
 int Device::saveImage()
@@ -507,75 +567,153 @@ void Device::setPosition(const float nPosition[4])
     position.z = nPosition[2];
     position.w = nPosition[3];
 
-    restartDevice();
+    updatePosition();
 }
 
-void Device::zoom(float zoomValue)
+void Device::setPosition(const double nPosition[4])
 {
-    //zoomValue = 1;
-    float pixel_width = abs(position.y - position.x);
-    float pixel_height = abs(position.w - position.z);
-    float middleX = (position.x + position.y) / 2;
-    float middleY = (position.z + position.w) / 2;
+    dPosition.x = nPosition[0];
+    dPosition.y = nPosition[1];
+    dPosition.z = nPosition[2];
+    dPosition.w = nPosition[3];
 
-    position.x = middleX - pixel_width / 2 * zoomValue;
-    position.y = middleX + pixel_width / 2 * zoomValue;
+    updatePosition();
+}
 
-    position.z = middleY - pixel_height / 2 * zoomValue;
-    position.w = middleY + pixel_height / 2 * zoomValue;
-    realPosition = position;
-    restartDevice();
+void Device::zoom(float nzoomValue)
+{
+    if (!use_fp64)
+    {
+        //zoomValue = 1;
+        float pixel_width = abs(position.y - position.x);
+        float pixel_height = abs(position.w - position.z);
+        float middleX = (position.x + position.y) / 2;
+        float middleY = (position.z + position.w) / 2;
+
+        position.x = middleX - pixel_width / 2 * nzoomValue;
+        position.y = middleX + pixel_width / 2 * nzoomValue;
+
+        position.z = middleY - pixel_height / 2 * nzoomValue;
+        position.w = middleY + pixel_height / 2 * nzoomValue;
+        realPosition = position;
+    }
+    else
+    {
+        double pixel_width = abs(dPosition.y - dPosition.x);
+        double pixel_height = abs(dPosition.w - dPosition.z);
+        double middleX = (dPosition.x + dPosition.y) / 2;
+        double middleY = (dPosition.z + dPosition.w) / 2;
+
+        dPosition.x = middleX - pixel_width / 2 * nzoomValue;
+        dPosition.y = middleX + pixel_width / 2 * nzoomValue;
+
+        dPosition.z = middleY - pixel_height / 2 * nzoomValue;
+        dPosition.w = middleY + pixel_height / 2 * nzoomValue;
+        drealPosition = dPosition;
+    }
+    zoomValue *= nzoomValue;
+    updatePosition();
 }
 
 void Device::fixRatio(bool by_x)
 {
-    prevPosition = position;
-    float ratio = (float)width / height;
-
-    if (by_x)
+    if (!use_fp64)
     {
-        float pixel_width = abs(position.w - position.z) * ratio;
-        float middlePoint = (position.x + position.y) / 2;
-        position.x = middlePoint - pixel_width / 2;
-        position.y = middlePoint + pixel_width / 2;
-    }
-    else {
-        float pixel_width = (position.y - position.x) / ratio;
-        float middlePoint = (position.z + position.w) / 2;
-        position.z = middlePoint - pixel_width / 2;
-        position.w = middlePoint + pixel_width / 2;
-    }
-    realPosition = position;
-    restartDevice();
-    position = prevPosition;
+        prevPosition = position;
+        float ratio = (float)width / height;
 
+        if (by_x)
+        {
+            float pixel_width = abs(position.w - position.z) * ratio;
+            float middlePoint = (position.x + position.y) / 2;
+            position.x = middlePoint - pixel_width / 2;
+            position.y = middlePoint + pixel_width / 2;
+        }
+        else {
+            float pixel_width = (position.y - position.x) / ratio;
+            float middlePoint = (position.z + position.w) / 2;
+            position.z = middlePoint - pixel_width / 2;
+            position.w = middlePoint + pixel_width / 2;
+        }
+        realPosition = position;
+        updatePosition();
+        position = prevPosition;
+    }
+    else
+    {
+        double ratio = (double)width / height;
+
+        if (by_x)
+        {
+            double pixel_width = abs(dPosition.w - dPosition.z) * ratio;
+            double middlePoint = (dPosition.x + dPosition.y) / 2;
+            dPosition.x = middlePoint - pixel_width / 2;
+            dPosition.y = middlePoint + pixel_width / 2;
+        }
+        else {
+            double pixel_width = (dPosition.y - dPosition.x) / ratio;
+            double middlePoint = (dPosition.z + dPosition.w) / 2;
+            dPosition.z = middlePoint - pixel_width / 2;
+            dPosition.w = middlePoint + pixel_width / 2;
+        }
+        drealPosition = dPosition;
+        updatePosition();
+    }
 }
 
 
 void Device::setMiddlePosition(const int nPosition[2])
 {
-    float positionX = position.x + (float)nPosition[0] / width * (position.y - position.x);
-    float positionY = position.z + (float)nPosition[1] / height * (position.w - position.z);
+    if (!use_fp64)
+    {
+        float positionX = position.x + (float)nPosition[0] / width * (position.y - position.x);
+        float positionY = position.z + (float)nPosition[1] / height * (position.w - position.z);
 
-    float ratio = (float)width / height;
-    float pixel_height = abs(position.w - position.z);
-    float pixel_width = abs(position.y - position.x);
+        float ratio = (float)width / height;
+        float pixel_height = abs(position.w - position.z);
+        float pixel_width = abs(position.y - position.x);
 
-    position.x = positionX - pixel_width / 2;
-    position.y = positionX + pixel_width / 2;
+        position.x = positionX - pixel_width / 2;
+        position.y = positionX + pixel_width / 2;
 
-    position.z = positionY - pixel_height / 2;
-    position.w = positionY + pixel_height / 2;
+        position.z = positionY - pixel_height / 2;
+        position.w = positionY + pixel_height / 2;
 
-    float middleX = position.x + nPosition[0] * pixel_width;
-    float middleY = position.z + nPosition[1] * pixel_height;
+        float middleX = position.x + nPosition[0] * pixel_width;
+        float middleY = position.z + nPosition[1] * pixel_height;
 
-    //position.x = middleX - pixel_width / 2;
-    //position.y = middleX + pixel_width / 2;
-    //
-    //position.z = middleY - pixel_height / 2;
-    //position.w = middleY + pixel_height / 2;
-    realPosition = position;
+        //position.x = middleX - pixel_width / 2;
+        //position.y = middleX + pixel_width / 2;
+        //
+        //position.z = middleY - pixel_height / 2;
+        //position.w = middleY + pixel_height / 2;
+        realPosition = position;
+    }
+    else
+    {
+        double positionX = dPosition.x + (double)nPosition[0] / width * (dPosition.y - dPosition.x);
+        double positionY = dPosition.z + (double)nPosition[1] / height * (dPosition.w - dPosition.z);
+
+        double ratio = (double)width / height;
+        double pixel_height = abs(dPosition.w - dPosition.z);
+        double pixel_width = abs(dPosition.y - dPosition.x);
+
+        dPosition.x = positionX - pixel_width / 2;
+        dPosition.y = positionX + pixel_width / 2;
+
+        dPosition.z = positionY - pixel_height / 2;
+        dPosition.w = positionY + pixel_height / 2;
+
+        float middleX = dPosition.x + nPosition[0] * pixel_width;
+        float middleY = dPosition.z + nPosition[1] * pixel_height;
+
+        //position.x = middleX - pixel_width / 2;
+        //position.y = middleX + pixel_width / 2;
+        //
+        //position.z = middleY - pixel_height / 2;
+        //position.w = middleY + pixel_height / 2;
+        drealPosition = dPosition;
+    }
 
     fixRatio(true);
 

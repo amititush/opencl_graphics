@@ -136,6 +136,7 @@ int main()
         ImGui::NewFrame();
 
         static float position[4] = { 0 };
+        static double dPosition[4] = { 0 };
         {
             ImGui::Begin("Mandelbrot Render settings");
             static int res[2] = { WIDTH, HEIGHT };
@@ -153,10 +154,24 @@ int main()
             position[2] = device.realPosition.z;
             position[3] = device.realPosition.w;
 
+            dPosition[0] = device.drealPosition.x;
+            dPosition[1] = device.drealPosition.y;
+            dPosition[2] = device.drealPosition.z;
+            dPosition[3] = device.drealPosition.w;
+
             ImGui::InputFloat4("Position", position);
             if (ImGui::Button("Set position"))
             {
-                device.setPosition(position);
+                if (!device.use_fp64)
+                    device.setPosition(position);
+                else
+                {
+                    dPosition[0] = position[0];
+                    dPosition[1] = position[1];
+                    dPosition[2] = position[2];
+                    dPosition[3] = position[3];
+                    device.setPosition(dPosition);
+                }
                 device.runMandelbrot();
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, device.width, device.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, device.imageData);
                 position[0] = device.position.x;
@@ -172,7 +187,8 @@ int main()
                 device.runMandelbrot();
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, device.width, device.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, device.imageData);
             }
-
+            const std::string zoomValue = "Zoom value x" + std::to_string(1/device.zoomValue);
+            ImGui::Text(zoomValue.c_str());
             ImGui::End();
         }
 

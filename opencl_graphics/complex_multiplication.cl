@@ -95,6 +95,15 @@ float2 multiply_complex_inner(float2 real1, float2 real2)
 	return result;
 }
 
+double2 dmultiply_complex_inner(double2 real1, double2 real2)
+{
+	double2 result;
+	result.x = real1.x * real2.x - real1.y * real2.y;
+	result.y = real1.x * real2.y + real2.x * real1.y;
+
+	return result;
+}
+
 
 kernel void multiply_complex(__global float2* real1_in, __global float2* real2_in, __global float2* real_out)
 {
@@ -141,6 +150,11 @@ kernel void power_complex(__global float2* real_in, __global int* exponent, __gl
 }
 
 float complexLength(float2 number)
+{
+	return number.x * number.x + number.y * number.y;
+}
+
+double dcomplexLength(double2 number)
 {
 	return number.x * number.x + number.y * number.y;
 }
@@ -201,3 +215,56 @@ kernel void image_proc(write_only image2d_t image, read_only image1d_t palette, 
 	//color = (uint4)(100, 150, 50, 255);
 	write_imageui(image, coord, color);
 }
+
+#ifdef FP_64
+kernel void dimage_proc(write_only image2d_t image, read_only image1d_t palette, sampler_t paletteSampler, __global double4* position)
+{
+	uint2 dims = (uint2)(get_image_width(image), get_image_height(image));
+	int2 coord = (int2)(get_global_id(0), get_global_id(1));
+	double2 num = (double2)(position->x + (double)coord.x / dims.x * (position->y - position->x), position->z + (double)coord.y / dims.y * (position->w - position->z));
+
+	double2 fraction = (double2)((double)coord[0] / dims[0], (double)coord[1] / dims[1]);
+
+	double2 z0 = (double2)(0, 0);
+	double2 zk = (double2)(0, 0);
+	int i;
+	for (i = 0; i < MAX_ITERATIONS; i++)
+	{
+		z0 = dmultiply_complex_inner(z0, z0);
+		z0.x += num.x;
+		z0.y += num.y;
+
+		if (dcomplexLength(z0) > RADIUS)
+		{
+			break;
+		}
+	}
+	double frac = (double)i / MAX_ITERATIONS;
+	//uint4 color = (uint4)((uint)(fraction.x*255), (uint)(fraction.x*255), (uint)(fraction.x*255), 255);
+	uint4 color;// = (uint4)((uint)(frac * 255), (uint)(frac * 255), (uint)(frac * 255), 255);
+
+	if (i < MAX_ITERATIONS)
+	{
+		double nsmooth = log(z0.x * z0.x + z0.y * z0.y) / 2;
+		double nu = log(nsmooth / log(2.0f)) / log(2.0f);
+		//i = floor(i + 1 - nu);
+		uint4 tColor = read_imageui(palette, paletteSampler, i % COLORS);
+		//color *= 255;
+		//float3 tColor = HSVtoRGB(0.95f + 10 * ((float)i/MAX_ITERATIONS), 0.6f, 1.0f);
+		//color.x = 255 * (uint)tColor.x;
+		//color.y = 255 * (uint)tColor.y;
+		//color.z = 255 * (uint)tColor.z;
+		//color.w = 255;
+		//color = (uint4)(255 * tColor);
+		color = tColor;
+		//color.w = 255;
+	}
+	else
+	{
+		color = (uint4)(0, 0, 0, 255);
+	}
+
+	//color = (uint4)(100, 150, 50, 255);
+	write_imageui(image, coord, color);
+}
+#endif

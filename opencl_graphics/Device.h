@@ -32,12 +32,16 @@ public:
 	void restartDevice();
 	void setResolution(const int res[2]);
 	void setPosition(const float position[4]);
+	void setPosition(const double position[4]);
 	void zoom(float zoomValue);
 	void setMiddlePosition(const int position[2]);
+	void updatePosition();
 public:
 	cl_device_id deviceId;
 	char deviceName[32];
 	char contextDeviceName[32];
+
+	double zoomValue = 1;
 
 	int width = WIDTH;
 	int height = HEIGHT;
@@ -56,8 +60,14 @@ public:
 	unsigned char* paletteImageData;
 	cl_sampler paletteSampler;
 
+	cl_mem positionBuffer;
+
 	cl_float4 position = { -2.25, 0.75, -1.5, 1.5 };
+	cl_double4 dPosition = { -2.25, 0.75, -1.5, 1.5 };
 	cl_float4 prevPosition = { -2.25, 0.75, -1.5, 1.5 };
 	cl_float4 realPosition = { -2.25, 0.75, -1.5, 1.5 };
+	cl_double4 drealPosition = { -2.25, 0.75, -1.5, 1.5 };
+
+	bool use_fp64 = false;
 };
 
