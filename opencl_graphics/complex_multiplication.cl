@@ -151,11 +151,11 @@ float complexLength(float2 number)
 //	write_imageui(image, coord, (uint4)(color, 255));
 //}
 
-kernel void image_proc(write_only image2d_t image, read_only image1d_t palette, sampler_t paletteSampler)
+kernel void image_proc(write_only image2d_t image, read_only image1d_t palette, sampler_t paletteSampler, __global float4* position)
 {
 	uint2 dims = (uint2)(get_image_width(image), get_image_height(image));
 	int2 coord = (int2)(get_global_id(0), get_global_id(1));
-	float2 num = (float2)(X_MIN + (float)coord.x / dims.x * (X_MAX - X_MIN), Y_MIN + (float)coord.y / dims.y * (Y_MAX - Y_MIN));
+	float2 num = (float2)(position->x + (float)coord.x / dims.x * (position->y - position->x), position->z + (float)coord.y / dims.y * (position->w - position->z));
 
 	float2 fraction = (float2)((float)coord[0]/dims[0], (float)coord[1]/dims[1]);
 
